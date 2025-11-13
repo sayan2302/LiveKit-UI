@@ -1,10 +1,10 @@
 import {
-    ControlBar,
-    GridLayout,
-    ParticipantTile,
-    RoomAudioRenderer,
-    useTracks,
-    RoomContext,
+  ControlBar,
+  GridLayout,
+  ParticipantTile,
+  RoomAudioRenderer,
+  useTracks,
+  RoomContext,
 } from "@livekit/components-react";
 import { Room, Track } from "livekit-client";
 import "@livekit/components-styles";
@@ -13,98 +13,118 @@ import { MdCallEnd } from "react-icons/md";
 import { useLocation, useNavigate } from "react-router-dom";
 
 export default function VideoRoom() {
-    const { state } = useLocation();
-    const navigate = useNavigate();
+  const { state } = useLocation();
+  const navigate = useNavigate();
 
-    const token = state?.token;
-    const serverUrl = state?.livekitUrl;
+  const token = state?.token;
+  const serverUrl = state?.livekitUrl;
+  const [room] = useState(
+    () => new Room({ adaptiveStream: true, dynacast: true })
+  );
+  const [joined, setJoined] = useState(false);
 
-    const [room] = useState(() => new Room({ adaptiveStream: true, dynacast: true }));
+  const handleJoin = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: true,
+      });
+      console.log("🎤 Permission granted", stream);
 
-    useEffect(() => {
-        if (!token || !serverUrl) {
-            console.error("❌ Missing token or server URL");
-            alert("Call session expired or invalid!");
-            navigate("/");
-            return;
-        }
+      await room.connect(serverUrl, token);
+      await room.localParticipant.setMicrophoneEnabled(true);
+      await room.localParticipant.setCameraEnabled(true);
+    } catch (err) {
+      console.error("❌ Error accessing media:", err);
+      alert("Please allow mic/camera permissions in your browser settings.");
+    }
+  };
 
-        let mounted = true;
+  const connectRoom = async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      console.table(devices);
 
-        const connectRoom = async () => {
-            try {
-                if (mounted) {
-                    await room.connect(serverUrl, token);
-                    setTimeout(async () => {
-                        await room.localParticipant.setMicrophoneEnabled(true);
-                        await room.localParticipant.setCameraEnabled(true);
-                    }, 500);
+      // 🔹 Force mic permission via user gesture
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: true,
+      });
+      const [audioTrack] = stream.getAudioTracks();
+      const [videoTrack] = stream.getVideoTracks();
 
-                }
-            } catch (err) {
-                console.error("❌ LiveKit connection failed:", err);
-            }
-        };
+      await room.connect(serverUrl, token);
+      await room.localParticipant.publishTrack(audioTrack);
+      await room.localParticipant.publishTrack(videoTrack);
 
+      setJoined(true);
+    } catch (err) {
+      console.error("❌ Failed to connect or get media:", err);
+      alert("Error accessing mic or camera");
+    }
+  };
 
-        connectRoom();
+  const handleLeave = () => {
+    room.disconnect();
+    navigate("/");
+  };
 
-        return () => {
-            mounted = false;
-            room.disconnect();
-        };
-    }, [token, serverUrl, room, navigate]);
-
-    const handleLeave = () => {
-        room.disconnect();
-        navigate("/");
-    };
-
-    return (
+  return (
+    <div className="fixed inset-0 flex flex-col items-center justify-center bg-neutral-900 text-white">
+      {!joined ? (
+        <div className="text-center space-y-6">
+          <h1 className="text-2xl font-semibold">Ready to Join the Call??</h1>
+          <button
+            onClick={handleJoin}
+            className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition"
+          >
+            Join Now
+          </button>
+        </div>
+      ) : (
         <RoomContext.Provider value={room}>
-            <div className="fixed inset-0 bg-neutral-800 text-white flex flex-col h-screen w-screen pt-2">
-
-                {/* CONTROL BAR */}
-                <div className="max-w-[100dvw] px-2 flex h-[5dvh] mx-auto w-full items-center">
-                    <h1 className="text-lg font-semibold">POC Call</h1>
-                    <div className="flex-grow"></div>
-
-                    <ControlBar className="h-[5dvh]" />
-
-                    <button
-                        className="bg-red-600 px-4 py-2 rounded-lg hover:bg-red-500 transition ml-2"
-                        onClick={handleLeave}
-                    >
-                        <MdCallEnd size={22} />
-                    </button>
-                </div>
-
-                {/* Video Grid */}
-                <div className="p-2 h-[95dvh]">
-                    <VideoGrid />
-                </div>
-
-                {/* Audio */}
-                <RoomAudioRenderer />
+          <div className="flex flex-col h-screen w-screen">
+            {/* CONTROL BAR */}
+            <div className="flex items-center justify-between p-3 bg-neutral-800">
+              <h1 className="text-lg font-semibold">Live Call</h1>
+              <div className="flex items-center gap-3">
+                <ControlBar />
+                <button
+                  onClick={handleLeave}
+                  className="bg-red-600 hover:bg-red-500 px-3 py-2 rounded-lg transition"
+                >
+                  <MdCallEnd size={22} />
+                </button>
+              </div>
             </div>
+
+            {/* VIDEO GRID */}
+            <div className="flex-1 p-3 overflow-hidden">
+              <VideoGrid />
+            </div>
+
+            <RoomAudioRenderer />
+          </div>
         </RoomContext.Provider>
-    );
+      )}
+    </div>
+  );
 }
 
 function VideoGrid() {
-    const tracks = useTracks(
-        [
-            { source: Track.Source.Camera, withPlaceholder: true },
-            { source: Track.Source.ScreenShare, withPlaceholder: false },
-        ],
-        { onlySubscribed: false }
-    );
+  const tracks = useTracks(
+    [
+      { source: Track.Source.Camera, withPlaceholder: true },
+      { source: Track.Source.ScreenShare, withPlaceholder: false },
+    ],
+    { onlySubscribed: false }
+  );
 
-    return (
-        <GridLayout tracks={tracks} className="grid gap-2 h-full w-full">
-            <div className="rounded-xl overflow-hidden border border-neutral-700">
-                <ParticipantTile className="rounded-xl" />
-            </div>
-        </GridLayout>
-    );
+  return (
+    <GridLayout tracks={tracks} className="grid gap-2 h-full w-full">
+      {tracks.map((trackRef) => (
+        <ParticipantTile key={trackRef.publication.sid} trackRef={trackRef} />
+      ))}
+    </GridLayout>
+  );
 }
