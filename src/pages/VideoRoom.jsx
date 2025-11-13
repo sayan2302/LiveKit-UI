@@ -6,7 +6,7 @@ import {
     useTracks,
     RoomContext,
 } from "@livekit/components-react";
-import { createLocalAudioTrack, createLocalVideoTrack, Room, Track } from "livekit-client";
+import { Room, Track } from "livekit-client";
 import "@livekit/components-styles";
 import { useState, useEffect } from "react";
 import { MdCallEnd } from "react-icons/md";
