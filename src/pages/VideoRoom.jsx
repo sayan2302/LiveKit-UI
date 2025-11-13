@@ -38,8 +38,11 @@ export default function VideoRoom() {
                     const videoTrack = await createLocalVideoTrack();
 
                     await room.connect(serverUrl, token);
-                    await room.localParticipant.publishTrack(audioTrack);
-                    await room.localParticipant.publishTrack(videoTrack);
+                    setTimeout(async () => {
+                        await room.localParticipant.setMicrophoneEnabled(true);
+                        await room.localParticipant.setCameraEnabled(true);
+                    }, 500);
+
                 }
             } catch (err) {
                 console.error("❌ LiveKit connection failed:", err);
