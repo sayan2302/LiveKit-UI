@@ -25,6 +25,9 @@ export default function VideoRoom() {
   const [joined, setJoined] = useState(false);
 
   const handleJoin = async () => {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    console.log(devices);
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
