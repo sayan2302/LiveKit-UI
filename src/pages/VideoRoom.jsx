@@ -8,7 +8,7 @@ import {
 } from "@livekit/components-react";
 import { Room, Track } from "livekit-client";
 import "@livekit/components-styles";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { MdCallEnd } from "react-icons/md";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -21,6 +21,7 @@ export default function VideoRoom() {
   const [room] = useState(
     () => new Room({ adaptiveStream: true, dynacast: true })
   );
+  // eslint-disable-next-line
   const [joined, setJoined] = useState(false);
 
   const handleJoin = async () => {
@@ -37,30 +38,6 @@ export default function VideoRoom() {
     } catch (err) {
       console.error("❌ Error accessing media:", err);
       alert("Please allow mic/camera permissions in your browser settings.");
-    }
-  };
-
-  const connectRoom = async () => {
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      console.table(devices);
-
-      // 🔹 Force mic permission via user gesture
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: true,
-      });
-      const [audioTrack] = stream.getAudioTracks();
-      const [videoTrack] = stream.getVideoTracks();
-
-      await room.connect(serverUrl, token);
-      await room.localParticipant.publishTrack(audioTrack);
-      await room.localParticipant.publishTrack(videoTrack);
-
-      setJoined(true);
-    } catch (err) {
-      console.error("❌ Failed to connect or get media:", err);
-      alert("Error accessing mic or camera");
     }
   };
 
