@@ -8,7 +8,7 @@ import {
 } from "@livekit/components-react";
 import { Room, Track } from "livekit-client";
 import "@livekit/components-styles";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MdCallEnd } from "react-icons/md";
 import { useLocation, useNavigate } from "react-router-dom";
 
@@ -18,31 +18,38 @@ export default function VideoRoom() {
 
   const token = state?.token;
   const serverUrl = state?.livekitUrl;
-  const [room] = useState(
-    () => new Room({ adaptiveStream: true, dynacast: true })
-  );
-  // eslint-disable-next-line
-  const [joined, setJoined] = useState(false);
 
-  const handleJoin = async () => {
-    const devices = await navigator.mediaDevices.enumerateDevices();
-    console.log(devices);
+  const [room] = useState(() => new Room({ adaptiveStream: true, dynacast: true }));
 
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: true,
-      });
-      console.log("🎤 Permission granted", stream);
-
-      await room.connect(serverUrl, token);
-      await room.localParticipant.setMicrophoneEnabled(true);
-      await room.localParticipant.setCameraEnabled(true);
-    } catch (err) {
-      console.error("❌ Error accessing media:", err);
-      alert("Please allow mic/camera permissions in your browser settings.");
+  useEffect(() => {
+    if (!token || !serverUrl) {
+      console.error("❌ Missing token or server URL");
+      alert("Call session expired or invalid!");
+      navigate("/");
+      return;
     }
-  };
+
+    let mounted = true;
+
+    const connectRoom = async () => {
+      try {
+        if (mounted) {
+          await room.connect(serverUrl, token);
+          await room.localParticipant.setCameraEnabled(true);
+          await room.localParticipant.setMicrophoneEnabled(true);
+        }
+      } catch (err) {
+        console.error("❌ LiveKit connection failed:", err);
+      }
+    };
+
+    connectRoom();
+
+    return () => {
+      mounted = false;
+      room.disconnect();
+    };
+  }, [token, serverUrl, room, navigate]);
 
   const handleLeave = () => {
     room.disconnect();
@@ -50,44 +57,33 @@ export default function VideoRoom() {
   };
 
   return (
-    <div className="fixed inset-0 flex flex-col items-center justify-center bg-neutral-900 text-white">
-      {!joined ? (
-        <div className="text-center space-y-6">
-          <h1 className="text-2xl font-semibold">Ready to Join the Call??</h1>
+    <RoomContext.Provider value={room}>
+      <div className="fixed inset-0 bg-neutral-800 text-white flex flex-col h-screen w-screen pt-2">
+
+        {/* CONTROL BAR */}
+        <div className="max-w-[100dvw] px-2 flex h-[5dvh] mx-auto w-full items-center">
+          <h1 className="text-lg font-semibold">POC Call</h1>
+          <div className="flex-grow"></div>
+
+          <ControlBar className="h-[5dvh]" />
+
           <button
-            onClick={handleJoin}
-            className="px-6 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-semibold transition"
+            className="bg-red-600 px-4 py-2 rounded-lg hover:bg-red-500 transition ml-2"
+            onClick={handleLeave}
           >
-            Join Now
+            <MdCallEnd size={22} />
           </button>
         </div>
-      ) : (
-        <RoomContext.Provider value={room}>
-          <div className="flex flex-col h-screen w-screen">
-            {/* CONTROL BAR */}
-            <div className="flex items-center justify-between p-3 bg-neutral-800">
-              <h1 className="text-lg font-semibold">Live Call</h1>
-              <div className="flex items-center gap-3">
-                <ControlBar />
-                <button
-                  onClick={handleLeave}
-                  className="bg-red-600 hover:bg-red-500 px-3 py-2 rounded-lg transition"
-                >
-                  <MdCallEnd size={22} />
-                </button>
-              </div>
-            </div>
 
-            {/* VIDEO GRID */}
-            <div className="flex-1 p-3 overflow-hidden">
-              <VideoGrid />
-            </div>
+        {/* Video Grid */}
+        <div className="p-2 h-[95dvh]">
+          <VideoGrid />
+        </div>
 
-            <RoomAudioRenderer />
-          </div>
-        </RoomContext.Provider>
-      )}
-    </div>
+        {/* Audio */}
+        <RoomAudioRenderer />
+      </div>
+    </RoomContext.Provider>
   );
 }
 
@@ -102,9 +98,9 @@ function VideoGrid() {
 
   return (
     <GridLayout tracks={tracks} className="grid gap-2 h-full w-full">
-      {tracks.map((trackRef) => (
-        <ParticipantTile key={trackRef.publication.sid} trackRef={trackRef} />
-      ))}
+      <div className="rounded-xl overflow-hidden border border-neutral-700">
+        <ParticipantTile className="rounded-xl" />
+      </div>
     </GridLayout>
   );
 }
